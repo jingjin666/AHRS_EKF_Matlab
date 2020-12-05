@@ -1,7 +1,7 @@
 %ENU
 function [pitch0,roll0,yaw0] = acc2euler_ENU(acce_data,mag_data)
-    pitch0 = asin(acce_data(2)/norm(acce_data,2));
-    roll0 = atan2(-acce_data(1),acce_data(3));
+    pitch0 = asin(acce_data(2)/norm(acce_data));
+    roll0 = atan2(-acce_data(1)/norm(acce_data),acce_data(3)/norm(acce_data));
     
     m_x = mag_data(1)*cos(roll0)+mag_data(3)*sin(roll0);
     m_y = mag_data(1)*sin(pitch0)*sin(roll0)+ mag_data(2)*cos(pitch0)-mag_data(3)*cos(roll0)*sin(pitch0); 

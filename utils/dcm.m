@@ -34,3 +34,13 @@ disp(R_ENU_ZXY);
 %%NED
 R_NED_ZYX_N2B = Rx_NED * Ry_NED * Rz_NED;
 disp(R_NED_ZYX_N2B);
+
+
+%%mag
+C_nb = Rx_NED * Ry_NED * eye(3);
+disp(C_nb);
+
+syms Mx My Mz
+Mag_n = [Mx;My;Mz];
+Mag_b = C_nb * Mag_n;
+disp(Mag_b);
