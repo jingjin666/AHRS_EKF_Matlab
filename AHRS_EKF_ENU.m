@@ -7,6 +7,10 @@
 clc;
 clear;
 close all;
+
+addpath('utils');
+addpath('datafiles');
+
 rad2deg = 180/pi;
 deg2rad = pi/180;
 
@@ -57,8 +61,7 @@ R = a_measure_noise * eye(3);
 %状态矩阵
 X = zeros(L, 7);
 %初始化状态矩阵
-[pitch_init, roll_init, yaw_init] = acc2euler(acc, mag);
-%[roll_init, pitch_init, yaw_init] = acc2euler(acc, mag);
+[pitch_init, roll_init, yaw_init] = acc2euler_ENU(acc, mag);
 %初始化角度
 pitchEKF(1,1) = pitch_init*rad2deg;
 rollEKF(1,1) = roll_init*rad2deg;
@@ -67,8 +70,7 @@ disp(pitchEKF);
 disp(rollEKF);
 disp(yawEKF);
 %初始化四元数
-[q1, q2, q3, q4] = euler2quat(pitch_init, roll_init, yaw_init);
-%[q1, q2, q3, q4] = euler2quat(roll_init, pitch_init, yaw_init);
+[q1, q2, q3, q4] = euler2quat_ENU(pitch_init, roll_init, yaw_init);
 X(1,:) = [q1, q2, q3, q4, gyro_bias];
 
 %协方差矩阵
@@ -89,8 +91,7 @@ acc_att = zeros(L, 3);
 for k=1:L
     Time(k+1,1)=Time(k)+T; 
     
-    [pitch_, roll_, yaw_] = acc2euler(acc(k,:), mag(k,:));
-    %[roll_, pitch_, yaw_] = acc2euler(acc(k,:), mag(k,:));
+    [pitch_, roll_, yaw_] = acc2euler_ENU(acc(k,:), mag(k,:));
     acc_att(k,:) = [pitch_*rad2deg, roll_*rad2deg, yaw_*rad2deg];
     
     %加速度计数据归一化
@@ -145,8 +146,7 @@ for k=1:L
     
     q=[X(k,1),X(k,2),X(k,3),X(k,4)];
     
-    [pitchEKF(k,1),rollEKF(k,1),yawEKF(k,1)] = quat2euler(q);
-    %[rollEKF(k,1), pitchEKF(k,1),yawEKF(k,1)] = quat2euler(q);
+    [pitchEKF(k,1),rollEKF(k,1),yawEKF(k,1)] = quat2euler_ENU(q);
 end
 
 %% 画图

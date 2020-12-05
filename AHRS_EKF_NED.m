@@ -7,6 +7,10 @@
 clc;
 clear;
 close all;
+
+addpath('utils');
+addpath('datafiles');
+
 rad2deg = 180/pi;
 deg2rad = pi/180;
 
@@ -41,17 +45,18 @@ gyro = [X_GYRO - gyro_bias(1), Y_GYRO - gyro_bias(2), Z_GYRO - gyro_bias(3)];
 mag = [X_MAG, Y_MAG, Z_MAG];
 
 %角速度过程噪声,四元数噪声
-w_process_noise = 0.0001 * ones(1, 4);
+w_process_noise = 1e-6 * ones(1, 4);
 
 %角速度偏移过程噪声
-w_bias_process_noise = 0.003 * ones(1,3);
+w_bias_process_noise = 1e-8 * ones(1,3);
 
-%过程噪声矩阵
+%过程噪声矩阵 
 Q = diag([w_process_noise, w_bias_process_noise]);
 %disp(Q);
 
 %加速度计测量噪声
-a_measure_noise = 0.03;
+a_measure_noise = 0.1;
+%测量噪声矩阵
 R = a_measure_noise * eye(3);
 %disp(R)
 
@@ -75,6 +80,9 @@ p2 = 0 * ones(1, 3);
 P = diag([p1, p2]);
 %disp(P);
 
+%观测矩阵
+Z = zeros(L, 3);
+
 estimate_roll = zeros(L, 1);
 acc_roll = zeros(L, 1);
 estimate_pitch = zeros(L, 1);
@@ -88,6 +96,16 @@ for k=1:L
     if(k > 1)
         Time(k, 1) = Time(k-1, 1) + T;
     end
+    
+     %% 根据加速度计和磁力计得到姿态角
+     % 16375的俯仰角需要反向
+    [acc_roll(k, 1), acc_pitch(k, 1), acc_yaw(k, 1)] = acc2euler(acc(k, :), mag(k,:));
+    acc_roll(k) = acc_roll(k, 1) * rad2deg;
+    acc_pitch(k) = -acc_pitch(k, 1) * rad2deg;
+    acc_yaw(k) = acc_yaw(k, 1) * rad2deg;
+    
+    %归一化观测数据  
+    Z(k, :) = acc(k, :) / norm(acc(k, :));
     
     %% 预测过程
     %真实角速度
@@ -106,13 +124,8 @@ for k=1:L
     
     %状态预测
     next_state_vector = [q_new; w_bias_new];
-    
     %归一化
-    q_normalize = sqrt(next_state_vector(1)*next_state_vector(1) + next_state_vector(2)*next_state_vector(2) + next_state_vector(3)*next_state_vector(3) + next_state_vector(4)*next_state_vector(4));
-    next_state_vector(1) =  next_state_vector(1) / q_normalize;
-    next_state_vector(2) =  next_state_vector(2) / q_normalize;
-    next_state_vector(3) =  next_state_vector(3) / q_normalize;
-    next_state_vector(4) =  next_state_vector(4) / q_normalize;
+    next_state_vector(1:4) = next_state_vector(1:4) / norm(next_state_vector(1:4));
 
     %line矩阵4x3
     line = [quat(2), quat(3), quat(4);
@@ -143,34 +156,22 @@ for k=1:L
     K = P_next * H'* SP_inv;
     
     %计算残差
-    %归一化  
-    acc_normalize = sqrt(acc(k, 1)*acc(k, 1) + acc(k, 2)*acc(k, 2) + acc(k, 3)*acc(k, 3));
-    acc_x = acc(k, 1) / acc_normalize;
-    acc_y = acc(k, 2) / acc_normalize;
-    acc_z = acc(k, 3) / acc_normalize;
-    Z = [acc_x;acc_y;acc_z];
-    S = Z - H * next_state_vector;
+    S = Z(k, :)' - H * next_state_vector;
     
     %更新状态矩阵
     state_vector = next_state_vector + K * S;
     %归一化
-    q_normalize = sqrt(state_vector(1)*state_vector(1) + state_vector(2)*state_vector(2) + state_vector(3)*state_vector(3) + state_vector(4)*state_vector(4));
-    state_vector(1) =  state_vector(1) / q_normalize;
-    state_vector(2) =  state_vector(2) / q_normalize;
-    state_vector(3) =  state_vector(3) / q_normalize;
-    state_vector(4) =  state_vector(4) / q_normalize;
+    state_vector(1:4) = state_vector(1:4) / norm(state_vector(1:4));
+    
     
     %更新协方差矩阵
     P = (eye(7) - K * H) * P_next;
     
     %% 输出估计后的姿态
+    % 16375的俯仰角需要反向
     estimate_q = [state_vector(1), state_vector(2), state_vector(3), state_vector(4)];
     [estimate_roll(k, 1), estimate_pitch(k, 1), estimate_yaw(k, 1)] = quat2euler(estimate_q);
-    
-    [acc_roll(k, 1), acc_pitch(k, 1), acc_yaw(k, 1)] = acc2euler(acc(k, :), mag(k,:));
-    acc_roll(k) = acc_roll(k, 1) * rad2deg;
-    acc_pitch(k) = acc_pitch(k, 1) * rad2deg;
-    acc_yaw(k) = acc_yaw(k, 1) * rad2deg;
+    estimate_pitch(k, 1) = -estimate_pitch(k, 1);
 end
 
 %% 画图
