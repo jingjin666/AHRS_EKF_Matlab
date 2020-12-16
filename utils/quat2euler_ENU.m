@@ -7,5 +7,5 @@ function [pitch,roll,yaw] = quat2euler_ENU(q)
 
     pitch = asin(R_n2b(3,2))*rad2deg;
     roll  = atan2(-R_n2b(3,1),R_n2b(3,3))*rad2deg;
-    yaw   = atan2(-R_n2b(1,2),R_n2b(2,2))*rad2deg;  
+    yaw   = atan2(-R_n2b(1,2),R_n2b(2,2))*rad2deg;
 end

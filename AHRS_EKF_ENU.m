@@ -45,19 +45,19 @@ gyro = [X_GYRO - gyro_bias(1), Y_GYRO - gyro_bias(2), Z_GYRO - gyro_bias(3)];
 mag = [X_MAG, Y_MAG, Z_MAG];
 
 %角速度过程噪声,四元数噪声
-w_process_noise = 1e-6 * ones(1, 4);
+w_process_noise = 0.0001 * ones(1, 4);
 %角速度偏移过程噪声
-w_bias_process_noise = 1e-8 * ones(1,3);
+w_bias_process_noise = 0.003 * ones(1,3);
 %过程噪声矩阵
 Q = diag([w_process_noise, w_bias_process_noise]);
 %disp(Q);
 
 %加速度计测量噪声
-a_measure_noise = 1e-1 * ones(1, 3);
+a_measure_noise = 0.03 * ones(1, 3);
 %磁力计测量噪声
 m_measure_noise = 1e-5 * ones(1, 3);
 %测量噪声矩阵
-R = diag([a_measure_noise, m_measure_noise]);
+R = diag(a_measure_noise);
 %disp(R)
 
 %状态矩阵
@@ -74,6 +74,13 @@ disp(yawEKF);
 
 %初始化四元数
 [q1, q2, q3, q4] = euler2quat_ENU(pitch_init, roll_init, yaw_init);
+
+q_init = [q1, q2, q3, q4];
+[pitch_init1,roll_init1,yaw_init1] = quat2euler_ENU(q_init);
+disp(pitch_init1);
+disp(roll_init1);
+disp(yaw_init1);
+
 X(1,:) = [q1, q2, q3, q4, gyro_bias];
 
 %协方差矩阵
@@ -82,7 +89,7 @@ Pk(:,:,1) = eye(7);
 %disp(P);
 
 %观测矩阵
-Z = zeros(L, 6);
+Z = zeros(L, 3);
 
 %delta_t
 T = 0.01;
@@ -100,7 +107,7 @@ for k=1:L
     %加速度计/磁力计数据归一化
     acc(k, :) = acc(k, :) / norm(acc(k, :), 2);
     mag(k, :) = mag(k, :) / norm(mag(k, :), 2);
-    Z(k, :) = [acc(k, :) mag(k, :)];
+    Z(k, :) = acc(k, :);
     
     %% 预测过程
     %真实角速度
@@ -137,25 +144,12 @@ for k=1:L
     X_ = (A*X(k,:)')';  
     X_(1:4) = X_(1:4)/norm(X_(1:4),2); 
     
-    mx = Z(k, 4);
-    my = Z(k, 5);
-    mz = Z(k, 6);
-    h4 = my*(2*(X_(2)*X_(3)+X_(1)*X_(4)))+mz*(2*(X_(2)*X_(4)-X_(1)*X_(3)));
-    h5 = my*(2*(X_(1)*X_(1)-X_(2)*X_(2)+X_(3)*X_(3)))+mz*(2*(X_(3)*X_(4)+X_(1)*X_(2)));
-    h6 = my*(2*(X_(3)*X_(4)-X_(1)*X_(2)))+mz*(X_(1)*X_(1)-X_(2)*X_(2)-X_(3)*X_(3)+X_(4)*X_(4));
-    
     Pk_ = Ak * Pk(:,:,k) * Ak' + Q; 
-    hk = [2*(X_(2)*X_(4)-X_(1)*X_(3)) 2*(X_(1)*X_(2)+X_(3)*X_(4)) X_(1)^2+X_(4)^2-X_(2)^2-X_(3)^2 h4 h5 h6];
-
-    H4 = [my*X_(4)-mz*X_(3) my*X_(3)+mz*X_(4) my*X_(2)-mz*X_(1) my*X_(1)+mz*X_(2) 0 0 0];
-    H5 = [my*X_(1)+mz*X_(2) -my*X_(2)+mz*X_(1) my*X_(3)+mz*X_(4) -my*X_(4)+mz*X_(3) 0 0 0];
-    H6 = [-my*X_(2)+mz*X_(1) -my*X_(1)-mz*X_(2) my*X_(4)-mz*X_(3) my*X_(3)+mz*X_(4) 0 0 0];
+    hk = [2*(X_(2)*X_(4)-X_(1)*X_(3)) 2*(X_(1)*X_(2)+X_(3)*X_(4)) X_(1)^2+X_(4)^2-X_(2)^2-X_(3)^2];
+    
     Hk = 2*[-X_(3)  X_(4) -X_(1)  X_(2) 0 0 0;
                X_(2)  X_(1)  X_(4)  X_(3) 0 0 0;
-               X_(1) -X_(2) -X_(3)  X_(4) 0 0 0;
-               H4;
-               H5;
-               H6;];
+               X_(1) -X_(2) -X_(3)  X_(4) 0 0 0;];
 
     Kk = Pk_ * Hk' * ((Hk * Pk_ * Hk' + R)^(-1));  
     X(k+1,:) = (X_' + Kk * (Z(k,:) - hk)')';      
@@ -174,8 +168,8 @@ acc_roll = acc_att(:,2);
 rollEKF(3000) = 0;
 acc_roll(3000) = 0;
 
-plot(Time(16:2000),rollEKF(16:2000),Time(16:2000),acc_roll(16:2000));
-legend('roll-ekf','roll-acc','FontSize',10);
+plot(Time(16:2000),acc_roll(16:2000),Time(16:2000),rollEKF(16:2000));
+legend('roll-acc','roll-ekf','FontSize',10);
 xlabel('t / s','FontSize',20)
 ylabel('roll','FontSize',20)
 title('roll','FontSize',20);
@@ -187,8 +181,8 @@ acc_pitch = acc_att(:,1);
 pitchEKF(3000) = 0;
 acc_pitch(3000) = 0;
 
-plot(Time(16:2000),pitchEKF(16:2000),Time(16:2000),acc_pitch(16:2000));
-legend('pitch-ekf','pitch-acc','FontSize',10);
+plot(Time(16:2000),acc_pitch(16:2000),Time(16:2000),pitchEKF(16:2000));
+legend('pitch-acc','pitch-ekf','FontSize',10);
 xlabel('t / s','FontSize',20)
 ylabel('pitch','FontSize',20)
 title('pitch','FontSize',20);
@@ -199,8 +193,8 @@ mag_yaw = acc_att(:,3);
 yawEKF(3000) = 0;
 mag_yaw(3000) = 0;
 
-plot(Time(16:2000),yawEKF(16:2000),Time(16:2000),mag_yaw(16:2000));
-legend('yaw-ekf','yaw-mag','FontSize',10);
+plot(Time(16:2000),mag_yaw(16:2000),Time(16:2000),yawEKF(16:2000));
+legend('yaw-mag','yaw-ekf','FontSize',10);
 xlabel('t / s','FontSize',20)
 ylabel('yaw','FontSize',20)
 title('yaw','FontSize',20);
