@@ -46,17 +46,17 @@ gyro = [X_GYRO - gyro_bias(1), Y_GYRO - gyro_bias(2), Z_GYRO - gyro_bias(3)];
 mag = [X_MAG, Y_MAG, Z_MAG];
 
 %角速度过程噪声,四元数噪声
-w_process_noise = 0.0001 * ones(1, 4);
+w_process_noise = 1e-6 * ones(1, 4);
 
 %角速度偏移过程噪声
-w_bias_process_noise = 0.003 * ones(1,3);
+w_bias_process_noise = 1e-8 * ones(1,3);
 
 %过程噪声矩阵 
 Q = diag([w_process_noise, w_bias_process_noise]);
 %disp(Q);
 
 %加速度计测量噪声
-a_measure_noise = 0.03 * ones(1, 3);
+a_measure_noise = 1e-1 * ones(1, 3);
 %测量噪声矩阵
 R = diag(a_measure_noise);
 %disp(R)
@@ -90,7 +90,7 @@ state_vector = [q_init; gyro_bias];
 
 %协方差矩阵
 p1 = 1 * ones(1, 4);
-p2 = 0 * ones(1, 3);
+p2 = 1 * ones(1, 3);
 P = diag([p1, p2]);
 %disp(P);
 
@@ -160,11 +160,11 @@ for k=1:L
     
     %% 更新过程
     %计算观测矩阵H
-    %hk全部反向了NED下*-g
-    hk = 2 * [next_state_vector(3), -next_state_vector(4), next_state_vector(1), -next_state_vector(2);
+    %hk全部反向了NED下*-1
+    Hk = 2 * [next_state_vector(3), -next_state_vector(4), next_state_vector(1), -next_state_vector(2);
             -next_state_vector(2), -next_state_vector(1), -next_state_vector(4), -next_state_vector(3);
             -next_state_vector(1), next_state_vector(2), next_state_vector(3), -next_state_vector(4)];
-    H = [hk, zeros(3)];
+    H = [Hk, zeros(3)];
    
     %计算残差协方差
     SP = H * P_next * H' + R;
@@ -174,8 +174,11 @@ for k=1:L
     %计算卡尔曼增益
     K = P_next * H'* SP_inv;
     
+    X_ = next_state_vector(1:4);
+    hk = [-2*(X_(2)*X_(4)-X_(1)*X_(3));-2*(X_(1)*X_(2)+X_(3)*X_(4));-(X_(1)^2+X_(4)^2-X_(2)^2-X_(3)^2)];
+    
     %计算残差
-    S = Z(k, :)' - H * next_state_vector;
+    S = Z(k, :)' - hk;
     
     %更新状态矩阵
     state_vector = next_state_vector + K * S;
