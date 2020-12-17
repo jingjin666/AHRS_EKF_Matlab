@@ -101,6 +101,15 @@ estimate_roll = zeros(L, 1);
 acc_roll = zeros(L, 1);
 estimate_pitch = zeros(L, 1);
 acc_pitch = zeros(L, 1);
+
+%% 航向角卡尔曼滤波变量
+X1 = [yaw_init*deg2rad;0];
+P1 = zeros(2);
+%角度过程噪声和角速度过程噪声
+Q1 = diag([1e-6, 1e-8]);
+R1 = 0.1;
+%观测噪声
+Z1 = zeros(L);
 estimate_yaw = zeros(L, 1);
 mag_yaw = zeros(L, 1);
 
@@ -191,22 +200,55 @@ for k=1:L
     %% 输出估计后的姿态
     estimate_q = [state_vector(1), state_vector(2), state_vector(3), state_vector(4)];
     [estimate_roll(k, 1), estimate_pitch(k, 1), estimate_yaw(k, 1)] = quat2euler(estimate_q);
+    
+    
+    %% 加入KF滤波纠正偏航角
+    %θ_k=θ_k-1 + (Gyro - w_bias_k-1)*delta_t
+    %w_bias_k = w_bias_k-1
+    A = [1, -T;
+         0, 1];
+    B = [T;0];
+    w_z = gyro(k, 3);
+    H1 = [1,0];
+    I = eye(2);
+    %% KF预测
+    
+    %状态预测
+    X_next = A*X1 + B*w_z;
+    %协方差预测
+    P1_next = A*P1*A' + Q1;
+    
+    Z1(k) = getYaw(mag(k,:), estimate_roll(k, 1)*deg2rad, estimate_pitch(k, 1)*deg2rad);
+    %残差
+    S1 = Z1(k) - H1*X_next;
+    
+    %卡尔曼增益
+    SP1 = H1 * P1_next * H1' + R1;
+    K1 = P1_next * H1' * SP1^(-1);
+    
+    %状态更新
+    X1 = X1 + K1*S1;
+    
+    %协方差更新
+    P1 = (I - K1*H1)*P1_next;
+    
+    estimate_yaw(k, 1) = X1(1)*rad2deg;
 end
 
 %% 画图
-figure;
-plot(Time,acc_roll,Time,estimate_roll);
-legend('roll-acc','roll-ekf','FontSize',10);
-xlabel('t / s','FontSize',20)
-ylabel('roll','FontSize',20)
-title('roll','FontSize',20);
-
-figure;
-plot(Time,acc_pitch,Time,estimate_pitch);
-legend('pitch-acc','pitch-ekf','FontSize',10);
-xlabel('t / s','FontSize',20)
-ylabel('pitch','FontSize',20)
-title('pitch','FontSize',20);
+% figure;
+% plot(Time,acc_roll,Time,estimate_roll);
+% legend('roll-acc','roll-ekf','FontSize',10);
+% xlabel('t / s','FontSize',20)
+% ylabel('roll','FontSize',20)
+% title('roll','FontSize',20);
+% 
+% figure;
+% plot(Time,acc_pitch,Time,estimate_pitch);
+% legend('pitch-acc','pitch-ekf','FontSize',10);
+% xlabel('t / s','FontSize',20)
+% ylabel('pitch','FontSize',20)
+% title('pitch','FontSize',20);
 
 figure;
 plot(Time,mag_yaw,Time,estimate_yaw);

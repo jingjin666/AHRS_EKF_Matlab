@@ -14,7 +14,7 @@ function [roll, pitch, yaw] = quat2euler(q)
     pitch = -asin(R(3,1))*rad2deg;
     yaw   = atan2(R(2,1),R(1,1))*rad2deg;
     
-%     if(yaw < 0)
-%         yaw = yaw + 360;
-%     end
+    if(yaw < 0)
+        yaw = yaw + 360;
+    end
 end

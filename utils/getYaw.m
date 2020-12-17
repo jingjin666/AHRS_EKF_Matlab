@@ -1,11 +1,5 @@
 % NED
-function [roll, pitch, yaw] = acc2euler(acce_data, mag_data)
-    ax = acce_data(1)/norm(acce_data);
-    ay = acce_data(2)/norm(acce_data);
-    az = acce_data(3)/norm(acce_data);
-    roll = atan2(-ay, -az);
-    pitch = atan2(ax, sqrt(ay*ay + az*az));
-    
+function [yaw] = getYaw(mag_data, roll, pitch)
     mx = mag_data(1)/norm(mag_data);
     my = mag_data(2)/norm(mag_data);
     mz = mag_data(3)/norm(mag_data);
